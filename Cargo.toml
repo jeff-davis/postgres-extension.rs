@@ -1,0 +1,7 @@
+[package]
+name = "postgres-extension"
+version = "0.1.0"
+authors = ["Jeff Davis <pgsql@j-davis.com>"]
+
+[dependencies]
+libc = "*"
