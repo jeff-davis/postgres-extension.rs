@@ -3,9 +3,11 @@ name = "postgres-extension"
 version = "0.1.0"
 authors = ["Jeff Davis <jdavis@postgresql.org>"]
 edition = "2018"
+license = "PostgreSQL OR MIT"
+description = "Write PostgreSQL extensions in rust"
 
 [dependencies]
-libc = "*"
+libc = "0.2.47"
 
 [profile.dev]
 panic = "unwind"
