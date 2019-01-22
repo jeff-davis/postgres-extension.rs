@@ -1,12 +1,19 @@
+#![allow(non_snake_case)]
+#![allow(non_camel_case_types)]
 
 // dependencies
 extern crate libc;
 
-pub const PG_VERSION_NUM : i32 = 100000;
-pub const INDEX_MAX_KEYS : i32 = 32;
-pub const NAMEDATALEN : i32 = 64;
-pub const FLOAT4PASSBYVAL : i32 = 1;
-pub const FLOAT8PASSBYVAL : i32 = 1;
+// rust modules
+pub mod rust_utils;
+pub mod setjmp;
 
-// modules
+// PG modules
 pub mod fmgr;
+pub mod pg_config;
+pub mod postmaster;
+pub mod postgres;
+pub mod utils;
+
+#[global_allocator]
+static ALLOCATOR: rust_utils::PostgresAllocator = rust_utils::PostgresAllocator;

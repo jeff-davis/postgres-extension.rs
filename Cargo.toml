@@ -1,7 +1,14 @@
 [package]
 name = "postgres-extension"
 version = "0.1.0"
-authors = ["Jeff Davis <pgsql@j-davis.com>"]
+authors = ["Jeff Davis <jdavis@postgresql.org>"]
+edition = "2018"
 
 [dependencies]
 libc = "*"
+
+[profile.dev]
+panic = "unwind"
+
+[profile.release]
+panic = "unwind"

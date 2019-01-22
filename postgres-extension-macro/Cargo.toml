@@ -1,0 +1,15 @@
+[package]
+name = "postgres-extension-macro"
+version = "0.1.0"
+authors = ["Jeff Davis <jdavis@postgresql.org>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = "0.6.3"
+
+[dependencies.syn]
+version = "0.15.22"
+features = ["full"]
