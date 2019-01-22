@@ -15,4 +15,3 @@ pub mod c {
         pub fn pfree(ptr: *mut u8) -> ();
     }
 }
-
