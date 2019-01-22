@@ -93,7 +93,6 @@ pub static PG_MODULE_MAGIC_DATA: Pg_magic_struct =
 pub static PG_FUNCTION_INFO_V1_DATA : Pg_finfo_record =
     Pg_finfo_record { api_version : 1 };
 
-#[macro_use]
 #[macro_export]
 macro_rules! rust_panic_handler {
     ($e:expr) => {{

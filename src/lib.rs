@@ -9,6 +9,7 @@ pub mod rust_utils;
 pub mod setjmp;
 
 // PG modules
+pub mod executor;
 pub mod fmgr;
 pub mod pg_config;
 pub mod postmaster;

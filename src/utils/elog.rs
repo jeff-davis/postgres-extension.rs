@@ -53,7 +53,6 @@ extern "C" {
 }
 
 pub fn test_error() {
-    panic!("foo");
     let retval;
     unsafe {
         let mut local_sigjmp_buf = std::mem::uninitialized();
