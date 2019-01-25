@@ -1,15 +1,10 @@
 extern crate proc_macro;
-extern crate syn;
 
 use proc_macro::TokenStream;
 
-fn get_fn_name(input: TokenStream) -> String {
-    return syn::parse::<syn::ItemFn>(input).unwrap().ident.to_string();
-}
-
-#[proc_macro_attribute]
-pub fn postgres_function(_args: TokenStream, input: TokenStream) -> TokenStream {
-    let name = get_fn_name(input.clone());
+#[proc_macro]
+pub fn pg_function_info_v1(item: TokenStream) -> TokenStream {
+    let name = item.to_string();
     let v1_cc_name = format!("pg_finfo_{}", name);
     let panic_handler_name = format!("rs_panic_handler_{}", name);
 
@@ -30,10 +25,9 @@ pub fn postgres_function(_args: TokenStream, input: TokenStream) -> TokenStream 
         }}
         "###, name=name, panic_handler_name=panic_handler_name);
 
-    let code = format!("{v1_cc_code}\n{panic_handler_code}\n{input}\n",
+    let code = format!("{v1_cc_code}\n{panic_handler_code}\n",
                        v1_cc_code = v1_cc_code,
-                       panic_handler_code = panic_handler_code,
-                       input = input.to_string());
+                       panic_handler_code = panic_handler_code);
 
     eprintln!("code:\n{}", code);
 
