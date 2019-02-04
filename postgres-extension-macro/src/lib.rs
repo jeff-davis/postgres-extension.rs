@@ -29,7 +29,5 @@ pub fn pg_function_info_v1(item: TokenStream) -> TokenStream {
                        v1_cc_code = v1_cc_code,
                        panic_handler_code = panic_handler_code);
 
-    eprintln!("code:\n{}", code);
-
     return code.parse().unwrap();
 }

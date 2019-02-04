@@ -5,6 +5,13 @@ use libc::*;
 use std::ffi::CString;
 use crate::setjmp::*;
 
+#[repr(C)]
+pub struct ErrorContextCallback {
+    previous: *mut ErrorContextCallback,
+    callback: extern fn(arg: *mut c_void),
+    arg: *mut c_void,
+}
+
 #[macro_export]
 macro_rules! elog {
     ($elevel:expr, $fmt:expr, $($args:tt)*) => {
@@ -49,24 +56,37 @@ pub fn elog_internal(filename: &str, lineno: u32, elevel: i32, fmt: &str) -> () 
 
 extern "C" {
     #[allow(dead_code)]
-    static mut PG_exception_stack: *mut sigjmp_buf;
+    pub static mut PG_exception_stack: *mut sigjmp_buf;
+    pub static mut error_context_stack: *mut ErrorContextCallback;
 }
 
-pub fn test_error() {
-    let retval;
-    unsafe {
-        let mut local_sigjmp_buf = std::mem::uninitialized();
-        let save_exception_stack: *mut sigjmp_buf = PG_exception_stack;
-        if sigsetjmp(&mut local_sigjmp_buf, 0) == 0 {
-            PG_exception_stack = &mut local_sigjmp_buf;
-            retval = elog_internal(file!(), line!(), ERROR, "test error");
-        } else {
+pub struct PgError;
+
+#[macro_export]
+macro_rules! longjmp_panic {
+    ($e:expr) => {
+        let retval;
+        unsafe {
+            use postgres_extension::utils::elog
+                ::{PG_exception_stack,
+                   error_context_stack,
+                   PgError};
+            use postgres_extension::setjmp::{sigsetjmp,sigjmp_buf};
+            let save_exception_stack: *mut sigjmp_buf = PG_exception_stack;
+            let save_context_stack: *mut ErrorContextCallback = error_context_stack;
+            let mut local_sigjmp_buf: sigjmp_buf = std::mem::uninitialized();
+            if sigsetjmp(&mut local_sigjmp_buf, 0) == 0 {
+                PG_exception_stack = &mut local_sigjmp_buf;
+                retval = $e;
+            } else {
+                PG_exception_stack = save_exception_stack;
+                error_context_stack = save_context_stack;
+                POSTGRES_THREW_EXCEPTION = true;
+                panic!(PgError);
+            }
             PG_exception_stack = save_exception_stack;
-            POSTGRES_THREW_EXCEPTION = true;
-            panic!("caught longjmp");
+            error_context_stack = save_context_stack;
         }
-        PG_exception_stack = save_exception_stack;
+        retval
     }
-    return retval
 }
-

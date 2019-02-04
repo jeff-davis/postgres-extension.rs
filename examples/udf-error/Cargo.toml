@@ -1,0 +1,11 @@
+[package]
+name = "udf-error"
+version = "0.1.0"
+authors = ["Jeff Davis <jdavis@postgresql.org>"]
+
+[dependencies]
+postgres-extension = { path = "../.." }
+postgres-extension-macro = { path = "../../postgres-extension-macro" }
+
+[lib]
+crate-type = ["cdylib"]

@@ -102,15 +102,23 @@ macro_rules! rust_panic_handler {
 
         let retval = match result {
             Ok(val) => val,
-            Err(err) => {
-                use postgres_extension::utils::elog::*;
+            Err(err_any) => {
                 unsafe {
-                    if POSTGRES_THREW_EXCEPTION {
-                        POSTGRES_THREW_EXCEPTION = false;
+                    if err_any.is::<PgError>() {
                         pg_re_throw();
-                    } else {
-                        elog!(ERROR, "rust panic: {:?}", err);
+                        unreachable!()
                     }
+
+                    let message =
+                        if let Some(err_str) = err_any.downcast_ref::<&str>() {
+                            format!("{}", err_str)
+                        } else if let Some(err_str) = err_any.downcast_ref::<String>() {
+                            format!("{}", err_str)
+                        } else {
+                            format!("{:?}", err_any)
+                        };
+
+                    elog!(ERROR, "rust panic: {}", message);
                     unreachable!()
                 }
             }
