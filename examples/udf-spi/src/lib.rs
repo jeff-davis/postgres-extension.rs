@@ -3,7 +3,6 @@ extern crate postgres_extension;
 #[macro_use]
 extern crate postgres_extension_macro;
 
-use std::ffi::{CStr};
 use postgres_extension::utils::elog::*;
 use postgres_extension::fmgr::*;
 use postgres_extension::postgres::*;

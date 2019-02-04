@@ -1,5 +1,4 @@
 
-use std::marker::PhantomData;
 use std::ffi::{CString,CStr};
 use crate::utils::memutils::MemoryContext;
 use libc::*;
@@ -69,7 +68,7 @@ pub mod c {
     use super::*;
     extern {
         pub static SPI_processed: u64;
-        pub static SPI_tuptable: *mut crate::executor::spi::SPITupleTable;
+        pub static SPI_tuptable: *mut SPITupleTable;
         pub static SPI_result: c_int;
 
         pub fn SPI_connect() -> c_int;
@@ -189,8 +188,7 @@ pub struct SPIConnection;
 pub struct SPIResult<'a> {
     pub status: i32,
     processed: u64,
-    tuptable: *mut SPITupleTable,
-    phantom: PhantomData<&'a SPITupleTable>,
+    tuptable: &'a mut SPITupleTable,
 }
 
 impl SPIConnection {
@@ -199,15 +197,15 @@ impl SPIConnection {
         let query_ptr = query_cstring.as_ptr();
         unsafe {
             let status = c::SPI_execute(query_ptr, readonly, 0);
-            if status < 0 {
+            if status >= 0 {
+                return Ok(SPIResult {
+                    status: status,
+                    processed: c::SPI_processed,
+                    tuptable: &mut *c::SPI_tuptable,
+                })
+            } else {
                 return Err(status);
             }
-            return Ok(SPIResult {
-                status: status,
-                processed: c::SPI_processed,
-                tuptable: c::SPI_tuptable,
-                phantom: PhantomData,
-            })
         }
     }
 }
@@ -250,9 +248,9 @@ pub fn spi_connect() -> SPIConnection {
     return SPIConnection {};
 }
 
-pub fn spi_getvalue<'a,'b>(tuple: &'a HeapTupleData,
-                           tupdesc: &'b TupleDescData,
-                           attno: c_int) -> String {
+pub fn spi_getvalue(tuple: &HeapTupleData,
+                    tupdesc: &TupleDescData,
+                    attno: c_int) -> String {
     unsafe {
         let tuple_ptr: HeapTuple = tuple as *const HeapTupleData
             as *mut HeapTupleData;
