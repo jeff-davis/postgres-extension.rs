@@ -26,8 +26,6 @@ extern {
     pub fn pg_re_throw() -> ();
 }
 
-pub static mut POSTGRES_THREW_EXCEPTION: bool = false;
-
 pub const DEBUG5  : i32 = 10;
 pub const DEBUG4  : i32 = 11;
 pub const DEBUG3  : i32 = 12;
@@ -81,7 +79,6 @@ macro_rules! longjmp_panic {
             } else {
                 PG_exception_stack = save_exception_stack;
                 error_context_stack = save_context_stack;
-                POSTGRES_THREW_EXCEPTION = true;
                 panic!(PgError);
             }
             PG_exception_stack = save_exception_stack;
