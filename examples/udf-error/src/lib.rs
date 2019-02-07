@@ -9,13 +9,30 @@ use postgres_extension::utils::elog::*;
 
 pg_module_magic!();
 
-pg_function_info_v1!(udf_error);
-fn udf_error(_fcinfo: FunctionCallInfo) -> Datum {
+#[pg_export(V1)]
+fn udf_error(fcinfo: FunctionCallInfo) -> Datum {
     longjmp_panic!(elog_internal(file!(), line!(), ERROR, "test error"));
     return 1;
 }
 
-pg_function_info_v1!(udf_panic);
-fn udf_panic(_fcinfo: FunctionCallInfo) -> Datum {
+#[pg_export(V1)]
+fn udf_panic(fcinfo: FunctionCallInfo) -> Datum {
     panic!("udf panic")
+}
+
+#[pg_export(V1)]
+fn foo(fcinfo: FunctionCallInfo) -> Datum {
+    let mut v = vec![1,2];
+    let i = 1; //DatumGetInt32(pg_getarg(fcinfo,0).unwrap());
+    if i >= 1000 {
+        udf_panic(fcinfo);
+    }
+    else if i > 100 {
+        elog!(ERROR, "number {} is too big!", i);
+    }
+    else if i > 10 {
+        elog!(WARNING, "number {} is big", i);
+    }
+    v.push(i);
+    return Int32GetDatum(v[2] + 1);
 }
