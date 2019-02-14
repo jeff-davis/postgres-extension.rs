@@ -20,10 +20,20 @@ macro_rules! elog {
     };
 }
 
+type c_bool = c_char;
+
 extern {
     fn elog_start(filename : *const c_char, lineno : c_int, funcname : *const c_char ) -> ();
     fn elog_finish(elevel : c_int, fmt : *const c_char, ...) -> ();
-    pub fn pg_re_throw() -> ();
+    pub fn pg_re_throw() -> !;
+    pub fn errstart(elevel: c_int,
+                    filename: *const c_char,
+                    lineno: c_int,
+                    funcname: *const c_char,
+                    domain: *const c_char) -> c_bool;
+    pub fn errfinish(dummy: c_int, ...);
+    pub fn errmsg(fmt: *const c_char, ...) -> c_int;
+    pub fn errhint(fmt: *const c_char, ...) -> c_int;
 }
 
 pub const DEBUG5  : i32 = 10;
@@ -38,17 +48,28 @@ pub const WARNING : i32 = 19;
 pub const ERROR   : i32 = 20;
 pub const FATAL   : i32 = 21;
 pub const PANIC   : i32 = 22;
+
+pub const TEXTDOMAIN: *const c_char = std::ptr::null::<c_char>();
+
 pub fn elog_internal(filename: &str, lineno: u32, elevel: i32, fmt: &str) -> () {
     let cfilename = CString::new(filename).unwrap().as_ptr();
     let clineno = lineno as c_int;
     /* rust doesn't have a macro to provide the current function name */
     let cfuncname = std::ptr::null::<c_char>();
     let celevel = elevel as c_int;
-    let cfmt = CString::new(fmt).unwrap();
+    let cmessage = CString::new(fmt).unwrap();
+    let chint = CString::new("thehint").unwrap();
 
     unsafe {
-        elog_start(cfilename, clineno, cfuncname);
-        elog_finish(celevel, cfmt.as_ptr());
+        errstart(celevel, cfilename, clineno, cfuncname, TEXTDOMAIN);
+        errmsg(cmessage.as_ptr());
+        errhint(chint.as_ptr());
+
+        if elevel >= ERROR {
+            panic!(PgError);
+        } else {
+            errfinish(0);
+        }
     }
 }
 
@@ -59,6 +80,7 @@ extern "C" {
 }
 
 pub struct PgError;
+pub struct PgReThrow;
 
 #[macro_export]
 macro_rules! longjmp_panic {
@@ -79,7 +101,7 @@ macro_rules! longjmp_panic {
             } else {
                 PG_exception_stack = save_exception_stack;
                 error_context_stack = save_context_stack;
-                panic!(PgError);
+                panic!(PgReThrow);
             }
             PG_exception_stack = save_exception_stack;
             error_context_stack = save_context_stack;

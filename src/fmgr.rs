@@ -104,15 +104,18 @@ macro_rules! rust_panic_handler {
             Ok(val) => val,
             Err(err_any) => {
                 unsafe {
-                    if err_any.is::<PgError>() {
+                    if err_any.is::<PgReThrow>() {
                         pg_re_throw();
+                        unreachable!()
+                    }
+
+                    if err_any.is::<PgError>() {
+                        postgres_extension::utils::elog::errfinish(0);
                         unreachable!()
                     }
 
                     let message =
                         if let Some(err_str) = err_any.downcast_ref::<&str>() {
-                            format!("{}", err_str)
-                        } else if let Some(err_str) = err_any.downcast_ref::<String>() {
                             format!("{}", err_str)
                         } else {
                             format!("{:?}", err_any)

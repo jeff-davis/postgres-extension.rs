@@ -11,7 +11,7 @@ pg_module_magic!();
 
 #[pg_export(V1)]
 fn udf_error(fcinfo: FunctionCallInfo) -> Datum {
-    longjmp_panic!(elog_internal(file!(), line!(), ERROR, "test error"));
+    elog!(ERROR, "test error: {}", "foo");
     return 1;
 }
 
