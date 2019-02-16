@@ -109,19 +109,29 @@ macro_rules! rust_panic_handler {
                     } else if err_any.is::<PgError>() {
                         postgres_extension::utils::elog::errfinish(0);
                     } else {
-                        let message =
+                        use std::ffi::CString;
+
+                        let panic_message =
                             if let Some(err_str) = err_any.downcast_ref::<&str>() {
                                 format!("{}", err_str)
                             } else {
                                 format!("{:?}", err_any)
                             };
 
-                        ereport!(ERROR, (
-                            errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
-                            errmsg("rust panic: {}", message),
-                            errhint("find out what rust code caused the panic"),
-                            errdetail("some rust code caused a panic")
-                        ));
+                        let message = format!("rust panic: {}", panic_message);
+                        let hint = "find out what rust code caused the panic";
+                        let detail = "some rust code caused a panic";
+
+                        let cmessage = CString::new(message.as_str()).unwrap();
+                        let chint = CString::new(hint).unwrap();
+                        let cdetail = CString::new(detail).unwrap();
+
+                        pg_errstart(ERROR, file!(), line!());
+                        errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION);
+                        errmsg(cmessage.as_ptr());
+                        errhint(CString::new(hint).unwrap().as_ptr());
+                        errdetail(cdetail.as_ptr());
+                        errfinish(0);
                     }
                 }
                 unreachable!();

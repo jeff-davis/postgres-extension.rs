@@ -2,7 +2,6 @@
 #![allow(non_snake_case)]
 
 use libc::*;
-use std::ffi::CString;
 use crate::setjmp::*;
 
 #[repr(C)]
@@ -58,13 +57,14 @@ macro_rules! pg_errfmt {
 
 type c_bool = c_char;
 
-pub unsafe fn pg_errstart(elevel: i32, filename: &str, lineno: u32) -> bool {
-    let cfilename = CString::new(filename).unwrap();
+pub unsafe fn pg_errstart(elevel: i32, _filename: &str, lineno: u32) -> bool {
+    //TODO: find a way to make a constant c string out of file!()
+    let cfilename = std::ptr::null::<c_char>();
     let clineno = lineno as c_int;
     let cfuncname = std::ptr::null::<c_char>();
     let cdomain = std::ptr::null::<c_char>();
 
-    let result = errstart(elevel, cfilename.as_ptr(),
+    let result = errstart(elevel, cfilename,
                           clineno, cfuncname, cdomain);
 
     if result == 0 {
@@ -119,28 +119,6 @@ const fn make_sqlstate(ch1: char, ch2: char, ch3: char, ch4: char, ch5: char) ->
 }
 
 pub const ERRCODE_EXTERNAL_ROUTINE_EXCEPTION: c_int = make_sqlstate('3','8','0','0','0');
-
-pub fn elog_internal(filename: &str, lineno: u32, elevel: i32, fmt: &str) -> () {
-    let cfilename = CString::new(filename).unwrap().as_ptr();
-    let clineno = lineno as c_int;
-    /* rust doesn't have a macro to provide the current function name */
-    let cfuncname = std::ptr::null::<c_char>();
-    let celevel = elevel as c_int;
-    let cmessage = CString::new(fmt).unwrap();
-    let chint = CString::new("thehint").unwrap();
-
-    unsafe {
-        errstart(celevel, cfilename, clineno, cfuncname, TEXTDOMAIN);
-        errmsg(cmessage.as_ptr());
-        errhint(chint.as_ptr());
-
-        if elevel >= ERROR {
-            panic!(PgError);
-        } else {
-            errfinish(0);
-        }
-    }
-}
 
 extern "C" {
     #[allow(dead_code)]

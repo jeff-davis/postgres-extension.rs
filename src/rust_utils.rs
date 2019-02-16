@@ -96,4 +96,3 @@ unsafe impl GlobalAlloc for PostgresAllocator {
         memutils::c::pfree(ptr);
     }
 }
-
