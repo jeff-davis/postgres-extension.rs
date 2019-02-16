@@ -11,7 +11,7 @@ use postgres_extension::executor::spi::*;
 pg_module_magic!();
 
 #[pg_export(V1)]
-fn udf_spi(fcinfo: FunctionCallInfo) -> Datum {
+fn udf_spi(_fcinfo: FunctionCallInfo) -> Datum {
     let spi = spi_connect();
     let res = spi.execute("select * from foo", false).unwrap();
     elog!(NOTICE, "status: {}", res.status);

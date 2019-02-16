@@ -5,6 +5,8 @@ extern crate syn;
 extern crate quote;
 
 use syn::export::Span;
+use syn::punctuated::Punctuated;
+use syn::token::Comma;
 use proc_macro::{TokenStream,TokenTree};
 
 /// Attribute macro does the following:
@@ -50,6 +52,8 @@ pub fn pg_export(args: TokenStream, input: TokenStream) -> TokenStream {
     let params = itemfn.decl.inputs;
     let return_type = itemfn.decl.output;
 
+    let arglist = params_to_arglist(&params);
+
     if itemfn.constness != None {
         panic!("const functions cannot be exported");
     }
@@ -83,7 +87,6 @@ pub fn pg_export(args: TokenStream, input: TokenStream) -> TokenStream {
             pub extern "C" fn #v1_cc_ident () ->
                 &'static postgres_extension::fmgr::Pg_finfo_record
             {
-
                 return &postgres_extension::fmgr::PG_FUNCTION_INFO_V1_DATA;
             }
         };
@@ -94,11 +97,40 @@ pub fn pg_export(args: TokenStream, input: TokenStream) -> TokenStream {
     let panic_handler_code = quote! {
         #[export_name=#name_lit]
         pub extern "C" fn #panic_handler_ident (#params) #return_type {
-            rust_panic_handler!(#name_ident(fcinfo))
+            rust_panic_handler!(#name_ident(#arglist))
         }
     };
 
     output.extend(TokenStream::from(panic_handler_code));
 
     output
+}
+
+fn params_to_arglist(params: &Punctuated<syn::FnArg, Comma>) -> Punctuated<&syn::Ident,Comma> {
+    let argnames = params.iter().map(|arg| {
+        match *arg {
+            syn::FnArg::SelfRef(_) | syn::FnArg::SelfValue(_) => {
+                panic!("self functions not supported")
+            }
+            syn::FnArg::Inferred(_) => {
+                panic!("inferred function parameters not supported")
+            }
+            syn::FnArg::Captured(ref captured) => {
+                match &captured.pat {
+                    syn::Pat::Ident(patident) => &patident.ident,
+                    _ => panic!("non-ident args not supported"),
+                }
+            },
+            syn::FnArg::Ignored(_) => {
+                panic!("ignored function args not supported")
+            }
+        }
+    });
+
+    let mut arglist = Punctuated::new();
+    for name in argnames {
+        arglist.push(name);
+    }
+
+    arglist
 }

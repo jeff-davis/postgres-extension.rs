@@ -10,7 +10,7 @@ use postgres_extension::utils::elog::*;
 pg_module_magic!();
 
 #[pg_export(V1)]
-fn udf_error(fcinfo: FunctionCallInfo) -> Datum {
+fn udf_error(_fcinfo: FunctionCallInfo) -> Datum {
     ereport!(ERROR,
              (errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
               errmsg("test error: {}", ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
@@ -21,7 +21,7 @@ fn udf_error(fcinfo: FunctionCallInfo) -> Datum {
 }
 
 #[pg_export(V1)]
-fn udf_panic(fcinfo: FunctionCallInfo) -> Datum {
+fn udf_panic(_fcinfo: FunctionCallInfo) -> Datum {
     panic!("udf panic")
 }
 
