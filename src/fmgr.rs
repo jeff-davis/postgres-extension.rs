@@ -106,24 +106,25 @@ macro_rules! rust_panic_handler {
                 unsafe {
                     if err_any.is::<PgReThrow>() {
                         pg_re_throw();
-                        unreachable!()
-                    }
-
-                    if err_any.is::<PgError>() {
+                    } else if err_any.is::<PgError>() {
                         postgres_extension::utils::elog::errfinish(0);
-                        unreachable!()
+                    } else {
+                        let message =
+                            if let Some(err_str) = err_any.downcast_ref::<&str>() {
+                                format!("{}", err_str)
+                            } else {
+                                format!("{:?}", err_any)
+                            };
+
+                        ereport!(ERROR, (
+                            errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+                            errmsg("rust panic: {}", message),
+                            errhint("find out what rust code caused the panic"),
+                            errdetail("some rust code caused a panic")
+                        ));
                     }
-
-                    let message =
-                        if let Some(err_str) = err_any.downcast_ref::<&str>() {
-                            format!("{}", err_str)
-                        } else {
-                            format!("{:?}", err_any)
-                        };
-
-                    elog!(ERROR, "rust panic: {}", message);
-                    unreachable!()
                 }
+                unreachable!();
             }
         };
         return retval

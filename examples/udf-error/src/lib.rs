@@ -11,7 +11,12 @@ pg_module_magic!();
 
 #[pg_export(V1)]
 fn udf_error(fcinfo: FunctionCallInfo) -> Datum {
-    elog!(ERROR, "test error: {}", "foo");
+    ereport!(ERROR,
+             (errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+              errmsg("test error: {}", ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+              errhint("asdf"),
+              errdetail("{} {} {}",1,2,3))
+    );
     return 1;
 }
 

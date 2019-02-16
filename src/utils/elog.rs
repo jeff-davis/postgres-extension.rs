@@ -14,17 +14,69 @@ pub struct ErrorContextCallback {
 
 #[macro_export]
 macro_rules! elog {
-    ($elevel:expr, $fmt:expr, $($args:tt)*) => {
-        postgres_extension::utils::elog::elog_internal(
-            file!(), line!(), $elevel, &format!($fmt, $($args)*));
+    ($elevel:expr, $($args:expr),+) => {
+        ereport!($elevel, (errmsg($($args),+)));
     };
+}
+
+#[macro_export]
+macro_rules! ereport {
+    ($elevel:expr, ($($kind:tt($($args:expr),*)),+)) => {
+        unsafe {
+            use postgres_extension::utils::elog::{
+                PgError, ERROR,
+                pg_errstart,errfinish,
+                errmsg,errhint,errcode,errdetail};
+
+            if pg_errstart($elevel, file!(), line!()) {
+
+                $(
+                    pg_errfmt!($kind,$($args),+);
+                )+
+
+                if $elevel >= ERROR {
+                    panic!(PgError);
+                } else {
+                    errfinish(0);
+                }
+            }
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! pg_errfmt {
+    (errcode, $arg:expr) => {
+        errcode($arg);
+    };
+    ($kind:tt, $($args:expr),+) => {
+        let s: &str = &format!($($args),+);
+        let cstring = std::ffi::CString::new(s).unwrap();
+        $kind(cstring.as_ptr());
+    }
 }
 
 type c_bool = c_char;
 
+pub unsafe fn pg_errstart(elevel: i32, filename: &str, lineno: u32) -> bool {
+    let cfilename = CString::new(filename).unwrap();
+    let clineno = lineno as c_int;
+    let cfuncname = std::ptr::null::<c_char>();
+    let cdomain = std::ptr::null::<c_char>();
+
+    let result = errstart(elevel, cfilename.as_ptr(),
+                          clineno, cfuncname, cdomain);
+
+    if result == 0 {
+        return false;
+    } else {
+        return true;
+    }
+}
+
 extern {
-    fn elog_start(filename : *const c_char, lineno : c_int, funcname : *const c_char ) -> ();
-    fn elog_finish(elevel : c_int, fmt : *const c_char, ...) -> ();
+    pub fn elog_start(filename : *const c_char, lineno : c_int, funcname : *const c_char ) -> ();
+    pub fn elog_finish(elevel : c_int, fmt : *const c_char, ...) -> ();
     pub fn pg_re_throw() -> !;
     pub fn errstart(elevel: c_int,
                     filename: *const c_char,
@@ -33,7 +85,9 @@ extern {
                     domain: *const c_char) -> c_bool;
     pub fn errfinish(dummy: c_int, ...);
     pub fn errmsg(fmt: *const c_char, ...) -> c_int;
+    pub fn errdetail(fmt: *const c_char, ...) -> c_int;
     pub fn errhint(fmt: *const c_char, ...) -> c_int;
+    pub fn errcode(sqlerrcode: c_int) -> c_int;
 }
 
 pub const DEBUG5  : i32 = 10;
@@ -50,6 +104,21 @@ pub const FATAL   : i32 = 21;
 pub const PANIC   : i32 = 22;
 
 pub const TEXTDOMAIN: *const c_char = std::ptr::null::<c_char>();
+
+const fn pgsixbit(ch: char) -> u32 {
+    return ((ch as u32) - ('0' as u32)) & 0x3f;
+}
+const fn make_sqlstate(ch1: char, ch2: char, ch3: char, ch4: char, ch5: char) -> i32 {
+    return (
+        (pgsixbit(ch1) << 0) +
+        (pgsixbit(ch2) << 6) +
+        (pgsixbit(ch3) << 12) +
+        (pgsixbit(ch4) << 18) +
+        (pgsixbit(ch5) << 24)
+    ) as i32;
+}
+
+pub const ERRCODE_EXTERNAL_ROUTINE_EXCEPTION: c_int = make_sqlstate('3','8','0','0','0');
 
 pub fn elog_internal(filename: &str, lineno: u32, elevel: i32, fmt: &str) -> () {
     let cfilename = CString::new(filename).unwrap().as_ptr();
