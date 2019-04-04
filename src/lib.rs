@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
+#![allow(non_upper_case_globals)]
 
 // dependencies
 extern crate libc;
@@ -14,6 +15,7 @@ pub mod fmgr;
 pub mod pg_config;
 pub mod postmaster;
 pub mod postgres;
+pub mod postgres_ext;
 pub mod utils;
 
 #[global_allocator]

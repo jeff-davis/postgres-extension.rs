@@ -9,6 +9,20 @@ use postgres_extension::utils::elog::*;
 
 pg_module_magic!();
 
+extern "C" {
+    fn int4div(fcinfo: FunctionCallInfo) -> Datum;
+    fn DirectFunctionCall2Coll(func: PGFunction, collation: Oid,
+                               arg1: Datum, arg2: Datum) -> Datum;
+}
+
+#[pg_export(V1)]
+fn udf_divzero(_fcinfo: FunctionCallInfo) -> Datum {
+    unsafe {
+        DirectFunctionCall2Coll(int4div, InvalidOid, 1, 0);
+    }
+    return 0;
+}
+
 #[pg_export(V1)]
 fn udf_error(_fcinfo: FunctionCallInfo) -> Datum {
     ereport!(ERROR,

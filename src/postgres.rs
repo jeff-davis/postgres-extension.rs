@@ -1,5 +1,5 @@
 
-#![allow(non_snake_case)]
+pub use crate::postgres_ext::*;
 
 pub type Datum = usize;
 

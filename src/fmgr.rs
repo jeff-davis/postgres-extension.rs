@@ -22,7 +22,7 @@ macro_rules! pg_module_magic {
 pub const FUNC_MAX_ARGS: c_int = 100;
 
 // types
-type PGFunction = extern fn(FunctionCallInfo) -> Datum;
+pub type PGFunction = unsafe extern fn(FunctionCallInfo) -> Datum;
 
 #[allow(non_camel_case_types)]
 type fmNodePtr = *mut c_void;
