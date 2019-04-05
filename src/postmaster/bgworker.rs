@@ -29,4 +29,6 @@ pub struct BackgroundWorker {
 
 extern "C" {
     pub fn RegisterBackgroundWorker(worker: &BackgroundWorker);
+    pub fn BackgroundWorkerBlockSignals();
+    pub fn BackgroundWorkerUnblockSignals();
 }

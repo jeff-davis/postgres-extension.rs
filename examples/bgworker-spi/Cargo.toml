@@ -1,0 +1,13 @@
+[package]
+name = "bgworker-spi"
+version = "0.1.0"
+authors = ["Jeff Davis <jdavis@postgresql.org>"]
+edition = "2018"
+
+[dependencies]
+postgres-extension = { path = "../.." }
+postgres-extension-macro = { path = "../../postgres-extension-macro" }
+tokio = "0.1"
+
+[lib]
+crate-type = ["cdylib"]
