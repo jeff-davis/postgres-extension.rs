@@ -2,6 +2,7 @@
 name = "udf-spi"
 version = "0.1.0"
 authors = ["Jeff Davis <jdavis@postgresql.org>"]
+edition = "2018"
 
 [dependencies]
 postgres-extension = { path = "../.." }

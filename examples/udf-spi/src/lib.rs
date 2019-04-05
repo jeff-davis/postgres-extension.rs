@@ -1,12 +1,12 @@
 #[macro_use]
-extern crate postgres_extension;
+extern crate postgres_extension as pgx;
 #[macro_use]
 extern crate postgres_extension_macro;
 
-use postgres_extension::utils::elog::*;
-use postgres_extension::fmgr::*;
-use postgres_extension::postgres::*;
-use postgres_extension::executor::spi::*;
+use pgx::utils::elog::*;
+use pgx::fmgr::*;
+use pgx::postgres::*;
+use pgx::executor::spi::*;
 
 pg_module_magic!();
 
