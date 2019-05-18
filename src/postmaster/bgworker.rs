@@ -31,4 +31,6 @@ extern "C" {
     pub fn RegisterBackgroundWorker(worker: &BackgroundWorker);
     pub fn BackgroundWorkerBlockSignals();
     pub fn BackgroundWorkerUnblockSignals();
+    pub fn BackgroundWorkerInitializeConnection(
+        dbname: *const c_char, username: *const c_char, flags: u32);
 }
