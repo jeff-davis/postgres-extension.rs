@@ -95,7 +95,7 @@ pub extern "C" fn bgw_main() {
         BackgroundWorkerInitializeConnection(dbname.as_ptr(), std::ptr::null(), 0);
 
         let cxt_name = CString::new("bgworker-spi context").unwrap();
-        BGWORKER_SPI_CONTEXT = AllocSetContextCreateExtended(
+        BGWORKER_SPI_CONTEXT = AllocSetContextCreateInternal(
             CurrentMemoryContext, cxt_name.as_ptr(),
             ALLOCSET_DEFAULT_MINSIZE,
             ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
