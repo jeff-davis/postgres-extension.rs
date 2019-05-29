@@ -121,9 +121,9 @@ pub mod c {
         pub fn SPI_returntuple(HeapTuple tuple, TupleDesc tupdesc) -> HeapTupleHeader;
         pub fn SPI_modifytuple(Relation rel, HeapTuple tuple, int natts,
 	int *attnum, Datum *Values, const char *Nulls) -> HeapTuple;
-        pub fn SPI_fnumber(TupleDesc tupdesc, const char *fname) -> int;
-        pub fn SPI_fname(TupleDesc tupdesc, int fnumber) -> *const c_char;
          */
+        pub fn SPI_fnumber(tupdesc: &TupleDescData, fname: *const c_char) -> c_int;
+        pub fn SPI_fname(tupdesc: &TupleDescData, fnumber: c_int) -> *const c_char;
         pub fn SPI_getvalue(tuple: HeapTuple, tupdesc: TupleDesc,
                             fnumber: c_int) -> *const c_char;
         /*
@@ -247,14 +247,6 @@ impl<'a> Drop for SPIResult<'a> {
     }
 }
 
-impl<'a> IntoIterator for &'a SPIResult<'a> {
-    type Item = SPITuple<'a>;
-    type IntoIter = SPIResultIter<'a>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
 pub struct SPIResultIter<'a> {
     pub result: &'a SPIResult<'a>,
     cur_tuple: isize,
@@ -291,13 +283,15 @@ impl<'a> SPITuple<'a> {
             cur_attr: 1,
         }
     }
-}
-
-impl<'a> IntoIterator for &'a SPITuple<'a> {
-    type Item = String;
-    type IntoIter = SPITupleIter<'a>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+    pub fn get_by_name(&self, name: &str) -> String {
+        let num = unsafe {
+            let cname = CString::new(name).unwrap();
+            c::SPI_fnumber(self.tupdesc, cname.as_ptr())
+        };
+        spi_getvalue(self.tuple, self.tupdesc, num as i32)
+    }
+    pub fn get_by_number(&self, num: usize) -> String {
+        spi_getvalue(self.tuple, self.tupdesc, num as i32)
     }
 }
 
@@ -325,9 +319,11 @@ pub fn spi_connect() -> SPIConnection {
     return SPIConnection {};
 }
 
+// attno starts at 1
 pub fn spi_getvalue(tuple: &HeapTupleData,
                     tupdesc: &TupleDescData,
                     attno: c_int) -> String {
+    assert!(attno > 0);
     unsafe {
         let tuple_ptr: HeapTuple = tuple as *const HeapTupleData
             as *mut HeapTupleData;
