@@ -206,8 +206,11 @@ impl SPIConnection {
 
 impl Drop for SPIConnection {
     fn drop(&mut self) {
-        unsafe {
-            c::SPI_finish();
+        // SPI_finish deletes memory contexts
+        if ! std::thread::panicking() {
+            unsafe {
+                c::SPI_finish();
+            }
         }
     }
 }
@@ -283,14 +286,14 @@ impl<'a> SPITuple<'a> {
             cur_attr: 1,
         }
     }
-    pub fn get_by_name(&self, name: &str) -> String {
+    pub fn field_by_name(&self, name: &str) -> String {
         let num = unsafe {
             let cname = CString::new(name).unwrap();
             c::SPI_fnumber(self.tupdesc, cname.as_ptr())
         };
         spi_getvalue(self.tuple, self.tupdesc, num as i32)
     }
-    pub fn get_by_number(&self, num: usize) -> String {
+    pub fn field_by_number(&self, num: usize) -> String {
         spi_getvalue(self.tuple, self.tupdesc, num as i32)
     }
 }
