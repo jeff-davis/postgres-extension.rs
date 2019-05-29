@@ -185,12 +185,6 @@ pub mod c {
 
 pub struct SPIConnection;
 
-pub struct SPIResult<'a> {
-    pub status: i32,
-    processed: u64,
-    tuptable: &'a mut SPITupleTable,
-}
-
 impl SPIConnection {
     pub fn execute(&self, query: &str, readonly: bool) -> Result<SPIResult,i32> {
         let query_cstring = CString::new(query).unwrap();
@@ -218,8 +212,14 @@ impl Drop for SPIConnection {
     }
 }
 
+pub struct SPIResult<'a> {
+    pub status: i32,
+    processed: u64,
+    tuptable: &'a mut SPITupleTable,
+}
+
 impl<'a> SPIResult<'a> {
-    pub fn tuples(&self) -> &'a [&HeapTupleData] {
+    pub fn raw_tuples(&self) -> &'a [&HeapTupleData] {
         unsafe {
             let vals: *const &HeapTupleData = (*self.tuptable).vals
                 as *const &HeapTupleData;
@@ -231,6 +231,12 @@ impl<'a> SPIResult<'a> {
             return &*(*self.tuptable).tupdesc;
         }
     }
+    pub fn iter(&self) -> SPIResultIter {
+        SPIResultIter {
+            result: self,
+            cur_tuple: 0,
+        }
+    }
 }
 
 impl<'a> Drop for SPIResult<'a> {
@@ -238,6 +244,77 @@ impl<'a> Drop for SPIResult<'a> {
         unsafe {
             c::SPI_freetuptable(self.tuptable);
         }
+    }
+}
+
+impl<'a> IntoIterator for &'a SPIResult<'a> {
+    type Item = SPITuple<'a>;
+    type IntoIter = SPIResultIter<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+pub struct SPIResultIter<'a> {
+    pub result: &'a SPIResult<'a>,
+    cur_tuple: isize,
+}
+
+impl<'a> Iterator for SPIResultIter<'a> {
+    type Item = SPITuple<'a>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cur_tuple as u64 >= self.result.processed {
+            return None;
+        }
+        let tuple = unsafe {
+            let ptr = *self.result.tuptable.vals.offset(self.cur_tuple);
+            ptr.as_ref().unwrap()
+        };
+        self.cur_tuple = self.cur_tuple + 1;
+        let spi_tuple = SPITuple {
+            tuple: tuple,
+            tupdesc: self.result.tupdesc(),
+        };
+        return Some(spi_tuple);
+    }
+}
+
+pub struct SPITuple<'a> {
+    tupdesc: &'a TupleDescData,
+    tuple: &'a HeapTupleData,
+}
+
+impl<'a> SPITuple<'a> {
+    pub fn iter(&'a self) -> SPITupleIter<'a> {
+        SPITupleIter {
+            tuple: self,
+            cur_attr: 1,
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a SPITuple<'a> {
+    type Item = String;
+    type IntoIter = SPITupleIter<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+pub struct SPITupleIter<'a> {
+    tuple: &'a SPITuple<'a>,
+    cur_attr: c_int,
+}
+
+impl<'a> Iterator for SPITupleIter<'a> {
+    type Item = String;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cur_attr > self.tuple.tupdesc.natts {
+            return None;
+        }
+        let val = spi_getvalue(self.tuple.tuple, self.tuple.tupdesc, self.cur_attr);
+        self.cur_attr = self.cur_attr + 1;
+        return Some(val);
     }
 }
 
