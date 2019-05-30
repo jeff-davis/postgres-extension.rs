@@ -1,5 +1,3 @@
 
-use libc::*;
-
-pub type Oid = c_long;
+pub type Oid = u32;
 pub const InvalidOid : Oid = 0;

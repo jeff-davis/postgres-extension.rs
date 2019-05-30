@@ -30,20 +30,14 @@ pub fn process_request(line: String) -> Vec<u8> {
         SetCurrentStatementStartTimestamp();
         StartTransactionCommand();
     }
+    let mut s = String::new();
     let spi = spi_connect();
     let res = spi.execute(&line, false).unwrap();
-    let tupdesc = res.tupdesc();
-    let natts = tupdesc.natts;
-    let tuples = res.tuples();
-    let mut s = String::from("{\n");
-    for tuple in tuples {
+    for tuple in res.iter() {
         s.push_str("  (");
-        for column in 1..=natts {
-            let val = spi_getvalue(tuple, tupdesc, column);
+        for val in tuple.iter() {
             s.push_str(&val);
-            if column < natts {
-                s.push_str(", ");
-            }
+            s.push_str(", ");
         }
         s.push_str(")\n");
     }

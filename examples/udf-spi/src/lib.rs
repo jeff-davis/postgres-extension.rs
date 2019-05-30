@@ -12,8 +12,9 @@ pg_module_magic!();
 
 #[pg_export(V1)]
 fn udf_spi(_fcinfo: FunctionCallInfo) -> Datum {
+    let query = "select * from foo";
     let spi = spi_connect();
-    let result = spi.execute("select * from foo", false).unwrap();
+    let result = spi.execute(query, false).unwrap();
     elog!(NOTICE, "status: {}", result.status);
     for tuple in result.iter() {
         let mut s = String::new();

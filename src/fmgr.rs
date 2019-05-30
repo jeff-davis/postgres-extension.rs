@@ -2,10 +2,11 @@
 // postgres includes
 use crate::pg_config::*;
 use crate::postgres::*;
+use crate::c::*;
+use std::ffi::CStr;
 
 // includes
-use libc::{c_int,c_void};
-use std::marker::PhantomData;
+use libc::*;
 
 #[macro_export]
 macro_rules! pg_module_magic {
@@ -60,23 +61,17 @@ pub struct FmgrInfo {
 
 
 #[repr(C)]
-struct FunctionCallInfoData<'a> {
+pub struct FunctionCallInfoBaseData {
     flinfo: *mut FmgrInfo,
     context: fmNodePtr,
     result_info: fmNodePtr,
-    fncollation: c_void,
-    isnull: bool,
-    nargs: u16,
-    arg: [Datum; FUNC_MAX_ARGS as usize],
-    argnull: [bool; FUNC_MAX_ARGS as usize],
-    phantom: PhantomData<&'a FmgrInfo>
+    fncollation: Oid,
+    isnull: u8,
+    nargs: c_short,
+    args: [NullableDatum; FUNC_MAX_ARGS as usize],
 }
 
-#[repr(C)]
-pub struct FunctionCallInfo<'a> {
-    ptr: *mut FunctionCallInfoData<'a>,
-    phantom: PhantomData<&'a FunctionCallInfoData<'a>>
-}
+pub type FunctionCallInfo = *mut FunctionCallInfoBaseData;
 
 // globals
 pub static PG_MODULE_MAGIC_DATA: Pg_magic_struct =
@@ -144,12 +139,27 @@ macro_rules! rust_panic_handler {
 // functions
 pub fn pg_getarg(fcinfo: FunctionCallInfo, arg_num: usize) -> Option<Datum> {
     unsafe {
-        if (*fcinfo.ptr).argnull[arg_num] {
-            assert!( !(*(*fcinfo.ptr).flinfo).fn_strict );
+        assert!( arg_num < (*fcinfo).nargs as usize );
+        if (*fcinfo).args[arg_num].isnull {
+            assert!( !(*(*fcinfo).flinfo).fn_strict );
             None
         } else {
-            Some((*fcinfo.ptr).arg[arg_num])
+            Some((*fcinfo).args[arg_num].value)
         }
     }
 }
 
+pub fn DatumGetTextP(value: Datum) -> &'static text {
+    let ptr: *const text = value as *mut text;
+    unsafe { ptr.as_ref().unwrap() }
+}
+
+pub fn TextToStr(arg: &text) -> &str {
+    unsafe {
+        CStr::from_ptr(&arg.vl_dat as *const c_char).to_str().unwrap()
+    }
+}
+
+pub fn pg_nargs(fcinfo: FunctionCallInfo) -> c_short {
+    unsafe { (*fcinfo).nargs }
+}

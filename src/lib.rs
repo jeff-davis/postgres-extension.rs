@@ -11,6 +11,7 @@ pub mod setjmp;
 
 // PG modules
 pub mod access;
+pub mod c;
 pub mod executor;
 pub mod fmgr;
 pub mod pg_config;
