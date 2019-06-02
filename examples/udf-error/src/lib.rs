@@ -15,16 +15,28 @@ extern "C" {
                                arg1: Datum, arg2: Datum) -> Datum;
 }
 
+struct Foo {
+    s: &'static str,
+}
+
+impl Drop for Foo {
+    fn drop(&mut self) {
+        eprintln!("destructor called: {}", self.s);
+    }
+}
+
 #[pg_export(V1)]
 fn udf_divzero(_fcinfo: FunctionCallInfo) -> Datum {
-    unsafe {
-        DirectFunctionCall2Coll(int4div, InvalidOid, 1, 0);
-    }
+    let _foo = Foo {s: "udf_divzero"};
+    longjmp_panic!(
+        DirectFunctionCall2Coll(int4div, InvalidOid, 1, 0)
+    );
     return 0;
 }
 
 #[pg_export(V1)]
 fn udf_error(_fcinfo: FunctionCallInfo) -> Datum {
+    let _foo = Foo {s: "udf_error"};
     ereport!(ERROR,
              (errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
               errmsg("test error: {}", ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
@@ -36,22 +48,6 @@ fn udf_error(_fcinfo: FunctionCallInfo) -> Datum {
 
 #[pg_export(V1)]
 fn udf_panic(_fcinfo: FunctionCallInfo) -> Datum {
+    let _foo = Foo {s: "udf_panic"};
     panic!("udf panic")
-}
-
-#[pg_export(V1)]
-fn foo(fcinfo: FunctionCallInfo) -> Datum {
-    let mut v = vec![1,2];
-    let i = 1; //DatumGetInt32(pg_getarg(fcinfo,0).unwrap());
-    if i >= 1000 {
-        udf_panic(fcinfo);
-    }
-    else if i > 100 {
-        elog!(ERROR, "number {} is too big!", i);
-    }
-    else if i > 10 {
-        elog!(WARNING, "number {} is big", i);
-    }
-    v.push(i);
-    return Int32GetDatum(v[2] + 1);
 }

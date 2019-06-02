@@ -8,6 +8,7 @@ pub type MemoryContext = *mut MemoryContextData;
 
 extern "C" {
     pub static mut CurrentMemoryContext: MemoryContext;
+    pub static mut TopMemoryContext: MemoryContext;
 }
 
 pub const ALLOCSET_DEFAULT_MINSIZE: size_t = 0;

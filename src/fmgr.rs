@@ -3,7 +3,10 @@
 use crate::pg_config::*;
 use crate::postgres::*;
 use crate::c::*;
+use crate::utils::memutils::*;
+use crate::utils::palloc::*;
 use std::ffi::CStr;
+use std::sync::atomic::AtomicPtr;
 
 // includes
 use libc::*;
@@ -91,6 +94,13 @@ pub static PG_FUNCTION_INFO_V1_DATA : Pg_finfo_record =
 #[macro_export]
 macro_rules! rust_panic_handler {
     ($e:expr) => {{
+        use postgres_extension::utils::memutils::*;
+        use postgres_extension::utils::palloc::*;
+        unsafe {
+            std::panic::set_hook(Box::new(|_| {
+                MemoryContextSwitchTo(TopMemoryContext);
+            }));
+        }
         let result = std::panic::catch_unwind(|| {
             $e
         });
