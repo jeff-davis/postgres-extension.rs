@@ -23,7 +23,7 @@ macro_rules! ereport {
     ($elevel:expr, ($($kind:tt($($args:expr),*)),+)) => {
         unsafe {
             use postgres_extension::utils::elog::{
-                PgError, ERROR,
+                PanicErrfinish, ERROR,
                 pg_errstart,errfinish,
                 errmsg,errhint,errcode,errdetail};
 
@@ -34,7 +34,7 @@ macro_rules! ereport {
                 )+
 
                 if $elevel >= ERROR {
-                    panic!(PgError);
+                    panic!(PanicErrfinish);
                 } else {
                     errfinish(0);
                 }
@@ -126,33 +126,6 @@ extern "C" {
     pub static mut error_context_stack: *mut ErrorContextCallback;
 }
 
-pub struct PgError;
-pub struct PgReThrow;
+pub struct PanicErrfinish;
+pub struct PanicReThrow;
 
-#[macro_export]
-macro_rules! longjmp_panic {
-    ($e:expr) => {
-        let retval;
-        unsafe {
-            use postgres_extension::utils::elog
-                ::{PG_exception_stack,
-                   error_context_stack,
-                   PgError};
-            use postgres_extension::setjmp::{sigsetjmp,sigjmp_buf};
-            let save_exception_stack: *mut sigjmp_buf = PG_exception_stack;
-            let save_context_stack: *mut ErrorContextCallback = error_context_stack;
-            let mut local_sigjmp_buf: sigjmp_buf = std::mem::uninitialized();
-            if sigsetjmp(&mut local_sigjmp_buf, 0) == 0 {
-                PG_exception_stack = &mut local_sigjmp_buf;
-                retval = $e;
-            } else {
-                PG_exception_stack = save_exception_stack;
-                error_context_stack = save_context_stack;
-                panic!(PgReThrow);
-            }
-            PG_exception_stack = save_exception_stack;
-            error_context_stack = save_context_stack;
-        }
-        retval
-    }
-}

@@ -1,13 +1,133 @@
 
+use std::alloc::{GlobalAlloc, Layout};
 use std::cmp;
 use std::fmt;
 use std::io;
 use std::io::{Error,ErrorKind,Result};
 use std::mem;
 
-use crate::utils::memutils;
-use std::alloc::{GlobalAlloc, Layout};
+use crate::utils::elog::*;
+use crate::utils::memutils::*;
+use crate::utils::memutils::c::*;
+use crate::utils::palloc::*;
 
+pub enum PanicType {
+    ReThrow,
+    Errfinish,
+}
+
+// Set up postgres allocator
+pub struct PostgresAllocator;
+
+static mut RUST_ERROR_CONTEXT: MemoryContext = std::ptr::null_mut();
+
+#[macro_export]
+macro_rules! rust_panic_handler {
+    ($e:expr) => {{
+        use postgres_extension::utils::elog;
+        use postgres_extension::rust_utils;
+
+        rust_utils::init_error_handling();
+        let result = std::panic::catch_unwind(|| {
+            $e
+        });
+
+        let panictype = match result {
+            Ok(val) => return val,
+            Err(err_any) => rust_utils::handle_panic(err_any),
+        };
+
+        unsafe {
+            match panictype {
+                rust_utils::PanicType::ReThrow => elog::pg_re_throw(),
+                rust_utils::PanicType::Errfinish => elog::errfinish(0),
+            }
+        };
+
+        unreachable!();
+    }}
+}
+
+#[macro_export]
+macro_rules! longjmp_panic {
+    ($e:expr) => {
+        let retval;
+        unsafe {
+            use postgres_extension::utils::elog
+                ::{PG_exception_stack,
+                   error_context_stack,
+                   PanicReThrow};
+            use postgres_extension::setjmp::{sigsetjmp,sigjmp_buf};
+            let save_exception_stack: *mut sigjmp_buf = PG_exception_stack;
+            let save_context_stack: *mut ErrorContextCallback = error_context_stack;
+            let mut local_sigjmp_buf: sigjmp_buf = std::mem::uninitialized();
+            if sigsetjmp(&mut local_sigjmp_buf, 0) == 0 {
+                PG_exception_stack = &mut local_sigjmp_buf;
+                retval = $e;
+            } else {
+                PG_exception_stack = save_exception_stack;
+                error_context_stack = save_context_stack;
+                panic!(PanicReThrow);
+            }
+            PG_exception_stack = save_exception_stack;
+            error_context_stack = save_context_stack;
+        }
+        retval
+    }
+}
+
+pub fn init_error_handling() {
+    unsafe {
+        if RUST_ERROR_CONTEXT == std::ptr::null_mut() {
+            RUST_ERROR_CONTEXT = AllocSetContextCreateInternal(
+                TopMemoryContext,
+                "Rust Error Context\0".as_ptr() as *const i8,
+                ALLOCSET_DEFAULT_MINSIZE,
+                ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
+
+            let oldcontext = MemoryContextSwitchTo(RUST_ERROR_CONTEXT);
+            std::panic::set_hook(Box::new(|_| {
+                MemoryContextSwitchTo(RUST_ERROR_CONTEXT);
+            }));
+            MemoryContextSwitchTo(oldcontext);
+        }
+    }
+}
+
+pub fn handle_panic(panic_payload: Box<dyn std::any::Any>) -> PanicType {
+    if panic_payload.is::<PanicReThrow>() {
+        PanicType::ReThrow
+    } else if panic_payload.is::<PanicErrfinish>() {
+        PanicType::Errfinish
+    } else {
+        use std::ffi::CString;
+
+        let panic_message =
+            if let Some(err_str) = panic_payload.downcast_ref::<&str>() {
+                format!("{}", err_str)
+            } else {
+                format!("{:?}", panic_payload)
+            };
+
+        let message = format!("rust panic: {}", panic_message);
+        let hint = "find out what rust code caused the panic";
+        let detail = "some rust code caused a panic";
+
+        let cmessage = CString::new(message.as_str()).unwrap();
+        let chint = CString::new(hint).unwrap();
+        let cdetail = CString::new(detail).unwrap();
+
+        unsafe {
+            pg_errstart(ERROR, file!(), line!());
+            errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION);
+            errmsg(cmessage.as_ptr());
+            errhint(chint.as_ptr());
+            errdetail(cdetail.as_ptr());
+        }
+
+        PanicType::Errfinish
+    }
+}
 
 // implement Write trait for &[i8] (a.k.a. &[c_char])
 pub trait Write {
@@ -85,14 +205,11 @@ impl<'a> Write for &'a mut [i8] {
     fn flush(&mut self) -> io::Result<()> { Ok(()) }
 }
 
-// Set up postgres allocator
-pub struct PostgresAllocator;
 unsafe impl GlobalAlloc for PostgresAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        return memutils::c::MemoryContextAlloc(
-            memutils::CurrentMemoryContext, layout.size());
+        return MemoryContextAlloc(CurrentMemoryContext, layout.size());
     }
     unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
-        memutils::c::pfree(ptr);
+        pfree(ptr);
     }
 }

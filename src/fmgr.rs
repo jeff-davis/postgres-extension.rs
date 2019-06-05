@@ -3,7 +3,6 @@
 use crate::pg_config::*;
 use crate::postgres::*;
 use crate::c::*;
-use crate::utils::memutils::*;
 use std::ffi::CStr;
 
 // includes
@@ -89,79 +88,6 @@ pub static PG_MODULE_MAGIC_DATA: Pg_magic_struct =
 pub static PG_FUNCTION_INFO_V1_DATA : Pg_finfo_record =
     Pg_finfo_record { api_version : 1 };
 
-pub static mut RUST_ERROR_CONTEXT: MemoryContext = std::ptr::null_mut();
-
-#[macro_export]
-macro_rules! rust_panic_handler {
-    ($e:expr) => {{
-        use postgres_extension::utils::memutils::*;
-        use postgres_extension::utils::memutils::c::*;
-        use postgres_extension::utils::palloc::*;
-        unsafe {
-            if RUST_ERROR_CONTEXT == std::ptr::null_mut() {
-                RUST_ERROR_CONTEXT = AllocSetContextCreateInternal(
-                    TopMemoryContext,
-                    "Rust Error Context\0".as_ptr() as *const i8,
-                    ALLOCSET_DEFAULT_MINSIZE,
-                    ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
-
-                let oldcontext = MemoryContextSwitchTo(RUST_ERROR_CONTEXT);
-                std::panic::set_hook(Box::new(|_| {
-                    MemoryContextSwitchTo(RUST_ERROR_CONTEXT);
-                }));
-                MemoryContextSwitchTo(oldcontext);
-            }
-        }
-        let result = std::panic::catch_unwind(|| {
-            $e
-        });
-
-        let rethrow = match result {
-            Ok(val) => return val,
-            Err(err_any) => {
-                if err_any.is::<PgReThrow>() {
-                    true
-                } else if err_any.is::<PgError>() {
-                    false
-                } else {
-                    use std::ffi::CString;
-
-                    let panic_message =
-                        if let Some(err_str) = err_any.downcast_ref::<&str>() {
-                            format!("{}", err_str)
-                        } else {
-                            format!("{:?}", err_any)
-                        };
-
-                    let message = format!("rust panic: {}", panic_message);
-                    let hint = "find out what rust code caused the panic";
-                    let detail = "some rust code caused a panic";
-
-                    let cmessage = CString::new(message.as_str()).unwrap();
-                    let chint = CString::new(hint).unwrap();
-                    let cdetail = CString::new(detail).unwrap();
-
-                    unsafe {
-                        pg_errstart(ERROR, file!(), line!());
-                        errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION);
-                        errmsg("rust panic\0".as_ptr() as *const i8);
-                        errhint("the int\0".as_ptr() as *const i8);
-                        errdetail("the detail\0".as_ptr() as *const i8);
-                    }
-                    false
-                }
-            }
-        };
-
-        if rethrow {
-            unsafe { pg_re_throw() }
-        } else {
-            unsafe { postgres_extension::utils::elog::errfinish(0) }
-        }
-
-        unreachable!();
-    }}
-}
 
 // functions
 pub fn pg_getarg(fcinfo: FunctionCallInfo, arg_num: usize) -> Option<Datum> {
