@@ -49,5 +49,5 @@ fn udf_error(_fcinfo: FunctionCallInfo) -> Datum {
 #[pg_export(V1)]
 fn udf_panic(_fcinfo: FunctionCallInfo) -> Datum {
     let _foo = Foo {s: "udf_panic"};
-    panic!("udf panic")
+    panic!("rust panic")
 }

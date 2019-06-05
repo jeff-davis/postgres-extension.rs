@@ -9,6 +9,7 @@ pub type MemoryContext = *mut MemoryContextData;
 extern "C" {
     pub static mut CurrentMemoryContext: MemoryContext;
     pub static mut TopMemoryContext: MemoryContext;
+    pub static mut ErrorContext: MemoryContext;
 }
 
 pub const ALLOCSET_DEFAULT_MINSIZE: size_t = 0;
@@ -19,6 +20,7 @@ pub mod c {
     use crate::utils::memutils::*;
     extern "C" {
         pub fn MemoryContextAlloc(context: MemoryContext, size: usize) -> *mut u8;
+        pub fn MemoryContextReset(context: MemoryContext);
         pub fn AllocSetContextCreateInternal(
             parent: MemoryContext, name: *const c_char, minContextSize: size_t,
             initBlockSize: size_t, maxBlockSize: size_t) -> MemoryContext;
