@@ -5,12 +5,14 @@ use std::fmt;
 use std::io;
 use std::io::{Error,ErrorKind,Result};
 use std::mem;
+use std::ffi::CString;
 
 use crate::utils::elog::*;
 use crate::utils::memutils::*;
 use crate::utils::memutils::c::*;
 use crate::utils::palloc::*;
 
+#[derive(Clone,Copy)]
 pub enum PanicType {
     ReThrow,
     Errfinish,
@@ -55,8 +57,8 @@ macro_rules! longjmp_panic {
         unsafe {
             use postgres_extension::utils::elog
                 ::{PG_exception_stack,
-                   error_context_stack,
-                   PanicReThrow};
+                   error_context_stack};
+            use postgres_extension::rust_utils::PanicType;
             use postgres_extension::setjmp::{sigsetjmp,sigjmp_buf};
             let save_exception_stack: *mut sigjmp_buf = PG_exception_stack;
             let save_context_stack: *mut ErrorContextCallback = error_context_stack;
@@ -67,7 +69,7 @@ macro_rules! longjmp_panic {
             } else {
                 PG_exception_stack = save_exception_stack;
                 error_context_stack = save_context_stack;
-                panic!(PanicReThrow);
+                panic!(PanicType::ReThrow);
             }
             PG_exception_stack = save_exception_stack;
             error_context_stack = save_context_stack;
@@ -94,39 +96,37 @@ pub fn init_error_handling() {
     }
 }
 
-pub fn handle_panic(panic_payload: Box<dyn std::any::Any>) -> PanicType {
-    if panic_payload.is::<PanicReThrow>() {
-        PanicType::ReThrow
-    } else if panic_payload.is::<PanicErrfinish>() {
-        PanicType::Errfinish
-    } else {
-        use std::ffi::CString;
-
-        let panic_message =
-            if let Some(err_str) = panic_payload.downcast_ref::<&str>() {
-                format!("{}", err_str)
-            } else {
-                format!("{:?}", panic_payload)
-            };
-
-        let message = format!("rust panic: {}", panic_message);
-        let hint = "find out what rust code caused the panic";
-        let detail = "some rust code caused a panic";
-
-        let cmessage = CString::new(message.as_str()).unwrap();
-        let chint = CString::new(hint).unwrap();
-        let cdetail = CString::new(detail).unwrap();
-
-        unsafe {
-            pg_errstart(ERROR, file!(), line!());
-            errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION);
-            errmsg(cmessage.as_ptr());
-            errhint(chint.as_ptr());
-            errdetail(cdetail.as_ptr());
-        }
-
-        PanicType::Errfinish
+pub fn handle_panic(payload: Box<dyn std::any::Any>) -> PanicType {
+    if let Some(panictype) = payload.downcast_ref::<PanicType>() {
+        return *panictype
     }
+
+    let panic_message =
+        if let Some(s) = payload.downcast_ref::<&str>() {
+            s
+        } else if let Some(s) = payload.downcast_ref::<String>() {
+            &s[..]
+        } else {
+            "Box<Any>"
+        };
+
+    let message = format!("rust panic: {}", panic_message);
+    let hint = "find out what rust code caused the panic";
+    let detail = "some rust code caused a panic";
+
+    let cmessage = CString::new(message.as_str()).unwrap();
+    let chint = CString::new(hint).unwrap();
+    let cdetail = CString::new(detail).unwrap();
+
+    unsafe {
+        pg_errstart(ERROR, file!(), line!());
+        errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION);
+        errmsg(cmessage.as_ptr());
+        errhint(chint.as_ptr());
+        errdetail(cdetail.as_ptr());
+    }
+
+    PanicType::Errfinish
 }
 
 // implement Write trait for &[i8] (a.k.a. &[c_char])

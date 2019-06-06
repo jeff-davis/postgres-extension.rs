@@ -22,21 +22,19 @@ macro_rules! elog {
 macro_rules! ereport {
     ($elevel:expr, ($($kind:tt($($args:expr),*)),+)) => {
         unsafe {
-            use postgres_extension::utils::elog::{
-                PanicErrfinish, ERROR,
-                pg_errstart,errfinish,
-                errmsg,errhint,errcode,errdetail};
+            use postgres_extension::utils::elog;
+            use postgres_extension::rust_utils::PanicType;
 
-            if pg_errstart($elevel, file!(), line!()) {
+            if elog::pg_errstart($elevel, file!(), line!()) {
 
                 $(
                     pg_errfmt!($kind,$($args),+);
                 )+
 
-                if $elevel >= ERROR {
-                    panic!(PanicErrfinish);
+                if $elevel >= elog::ERROR {
+                    panic!(PanicType::Errfinish);
                 } else {
-                    errfinish(0);
+                    elog::errfinish(0);
                 }
             }
         }
@@ -125,7 +123,4 @@ extern "C" {
     pub static mut PG_exception_stack: *mut sigjmp_buf;
     pub static mut error_context_stack: *mut ErrorContextCallback;
 }
-
-pub struct PanicErrfinish;
-pub struct PanicReThrow;
 
