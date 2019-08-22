@@ -6,6 +6,7 @@
 extern crate libc;
 
 // rust modules
+#[macro_use]
 pub mod rust_utils;
 pub mod setjmp;
 

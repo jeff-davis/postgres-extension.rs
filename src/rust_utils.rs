@@ -53,28 +53,32 @@ macro_rules! rust_panic_handler {
 #[macro_export]
 macro_rules! longjmp_panic {
     ($e:expr) => {
-        let retval;
-        unsafe {
-            use postgres_extension::utils::elog
-                ::{PG_exception_stack,
-                   error_context_stack};
-            use postgres_extension::rust_utils::PanicType;
-            use postgres_extension::setjmp::{sigsetjmp,sigjmp_buf};
-            let save_exception_stack: *mut sigjmp_buf = PG_exception_stack;
-            let save_context_stack: *mut ErrorContextCallback = error_context_stack;
-            let mut local_sigjmp_buf: sigjmp_buf = std::mem::uninitialized();
-            if sigsetjmp(&mut local_sigjmp_buf, 0) == 0 {
-                PG_exception_stack = &mut local_sigjmp_buf;
-                retval = $e;
-            } else {
+        {
+            #[allow(unused_unsafe)]
+            unsafe {
+                let retval;
+                use $crate::utils::elog
+                    ::{PG_exception_stack,
+                       error_context_stack,
+                       ErrorContextCallback};
+                use $crate::rust_utils::PanicType;
+                use $crate::setjmp::{sigsetjmp,sigjmp_buf};
+                let save_exception_stack: *mut sigjmp_buf = PG_exception_stack;
+                let save_context_stack: *mut ErrorContextCallback = error_context_stack;
+                let mut local_sigjmp_buf: sigjmp_buf = std::mem::uninitialized();
+                if sigsetjmp(&mut local_sigjmp_buf, 0) == 0 {
+                    PG_exception_stack = &mut local_sigjmp_buf;
+                    retval = $e;
+                } else {
+                    PG_exception_stack = save_exception_stack;
+                    error_context_stack = save_context_stack;
+                    panic!(PanicType::ReThrow);
+                }
                 PG_exception_stack = save_exception_stack;
                 error_context_stack = save_context_stack;
-                panic!(PanicType::ReThrow);
+                retval
             }
-            PG_exception_stack = save_exception_stack;
-            error_context_stack = save_context_stack;
         }
-        retval
     }
 }
 

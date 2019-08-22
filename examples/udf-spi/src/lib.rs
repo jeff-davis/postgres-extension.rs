@@ -10,8 +10,19 @@ use pgx::executor::spi::*;
 
 pg_module_magic!();
 
+struct Foo {
+    s: &'static str,
+}
+
+impl Drop for Foo {
+    fn drop(&mut self) {
+        eprintln!("destructor called: {}", self.s);
+    }
+}
+
 #[pg_export(V1)]
 fn udf_spi(_fcinfo: FunctionCallInfo) -> Datum {
+    let _foo = Foo {s: "udf_spi"};
     let query = "select * from foo";
     let spi = spi_connect();
     let result = spi.execute(query, false).unwrap();

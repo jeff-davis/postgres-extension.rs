@@ -190,7 +190,7 @@ impl SPIConnection {
         let query_cstring = CString::new(query).unwrap();
         let query_ptr = query_cstring.as_ptr();
         unsafe {
-            let status = c::SPI_execute(query_ptr, readonly, 0);
+            let status = longjmp_panic!(c::SPI_execute(query_ptr, readonly, 0));
             if status >= 0 {
                 return Ok(SPIResult {
                     status: status,
