@@ -32,24 +32,31 @@ pub fn process_request(line: String) -> Vec<u8> {
     }
     let mut s = String::new();
     let spi = spi_connect();
-    let res = spi.execute(&line, false).unwrap();
-    for tuple in res.iter() {
-        s.push_str("  (");
-        for val in tuple.iter() {
-            s.push_str(&val);
-            s.push_str(", ");
+    let catch = std::panic::catch_unwind(|| {
+        spi.execute(&line, false).unwrap()
+    });
+    match catch {
+        Ok(res) => {
+            for tuple in res.iter() {
+                s.push_str("  (");
+                for val in tuple.iter() {
+                    s.push_str(&val);
+                    s.push_str(", ");
+                }
+                s.push_str(")\n");
+            }
+            s.push_str("}\n");
+        },
+        Err(_e) => {
+            s.push_str("ERROR\n");
         }
-        s.push_str(")\n");
-    }
-    s.push_str("}\n");
+    };
     eprintln!("result: {}", s);
     unsafe {
         let oldcxt = MemoryContextSwitchTo(BGWORKER_SPI_CONTEXT);
         s = s.clone();
         MemoryContextSwitchTo(oldcxt);
     }
-    drop(res);
-    drop(spi);
     unsafe {
         CommitTransactionCommand();
     }
