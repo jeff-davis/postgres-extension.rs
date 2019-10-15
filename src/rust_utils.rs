@@ -21,6 +21,7 @@ pub enum PanicType {
 // Set up postgres allocator
 pub struct PostgresAllocator;
 
+static mut RUST_MEMORY_CONTEXT: MemoryContext = std::ptr::null_mut();
 static mut RUST_ERROR_CONTEXT: MemoryContext = std::ptr::null_mut();
 
 #[macro_export]
@@ -82,9 +83,21 @@ macro_rules! longjmp_panic {
     }
 }
 
+fn init_rust_memory_context() {
+    unsafe {
+        if RUST_MEMORY_CONTEXT.is_null() {
+            RUST_MEMORY_CONTEXT = AllocSetContextCreateInternal(
+                TopMemoryContext,
+                "Rust Memory Context\0".as_ptr() as *const i8,
+                ALLOCSET_DEFAULT_MINSIZE,
+                ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
+        }
+    }
+}
+
 pub fn init_error_handling() {
     unsafe {
-        if RUST_ERROR_CONTEXT == std::ptr::null_mut() {
+        if RUST_ERROR_CONTEXT.is_null() {
             RUST_ERROR_CONTEXT = AllocSetContextCreateInternal(
                 TopMemoryContext,
                 "Rust Error Context\0".as_ptr() as *const i8,
@@ -211,7 +224,8 @@ impl<'a> Write for &'a mut [i8] {
 
 unsafe impl GlobalAlloc for PostgresAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        return MemoryContextAlloc(CurrentMemoryContext, layout.size());
+        init_rust_memory_context();
+        return MemoryContextAlloc(RUST_MEMORY_CONTEXT, layout.size());
     }
     unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
         pfree(ptr);
