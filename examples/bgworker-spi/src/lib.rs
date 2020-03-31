@@ -102,8 +102,7 @@ pub extern "C" fn bgw_main() {
             ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
     }
 
-    let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
-    let addr = addr.parse::<SocketAddr>().unwrap();
+    let addr = String::from("127.0.0.1:8080").parse::<SocketAddr>().unwrap();
 
     let listener = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
