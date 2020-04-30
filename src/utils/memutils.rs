@@ -13,8 +13,8 @@ extern "C" {
 }
 
 pub const ALLOCSET_DEFAULT_MINSIZE: size_t = 0;
-pub const ALLOCSET_DEFAULT_INITSIZE: size_t = (8 * 1024);
-pub const ALLOCSET_DEFAULT_MAXSIZE: size_t = (8 * 1024 * 1024);
+pub const ALLOCSET_DEFAULT_INITSIZE: size_t = 8 * 1024;
+pub const ALLOCSET_DEFAULT_MAXSIZE: size_t = 8 * 1024 * 1024;
 
 pub mod c {
     use crate::utils::memutils::*;

@@ -61,7 +61,7 @@ pub const SPI_OK_REWRITTEN: i32 = 14;
 pub const SPI_OK_REL_REGISTER: i32 = 15;
 pub const SPI_OK_REL_UNREGISTER: i32 = 16;
 pub const SPI_OK_TD_REGISTER: i32 = 17;
-pub const SPI_OPT_NONATOMIC: i32 = (1 << 0);
+pub const SPI_OPT_NONATOMIC: i32 = 1 << 0;
 
 pub mod c {
     use libc::*;
