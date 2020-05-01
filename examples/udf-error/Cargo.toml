@@ -10,3 +10,8 @@ postgres-extension-macro = { path = "../../postgres-extension-macro" }
 
 [lib]
 crate-type = ["cdylib"]
+test = false
+bench = false
+
+[[bin]]
+name = "libinstall"
