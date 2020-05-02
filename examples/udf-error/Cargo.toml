@@ -7,6 +7,11 @@ edition = "2018"
 [dependencies]
 postgres-extension = { path = "../.." }
 postgres-extension-macro = { path = "../../postgres-extension-macro" }
+cdylib-plugin = "^0.1"
+pg-config = { path = "../../pg-config" }
+
+[build-dependencies]
+cdylib-plugin = "^0.1"
 
 [lib]
 crate-type = ["cdylib"]
