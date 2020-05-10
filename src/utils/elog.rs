@@ -2,7 +2,7 @@
 #![allow(non_snake_case)]
 
 use libc::*;
-use crate::setjmp::*;
+use setjmp::*;
 
 #[repr(C)]
 pub struct ErrorContextCallback {

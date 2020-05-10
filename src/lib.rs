@@ -4,11 +4,11 @@
 
 // dependencies
 extern crate libc;
+pub extern crate setjmp;
 
 // rust modules
 #[macro_use]
 pub mod rust_utils;
-pub mod setjmp;
 
 // PG modules
 pub mod access;
