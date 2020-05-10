@@ -8,7 +8,7 @@ edition = "2018"
 postgres-extension = { path = "../.." }
 postgres-extension-macro = { path = "../../postgres-extension-macro" }
 cdylib-plugin = "^0.1"
-pg-config = { path = "../../pg-config" }
+postgres-util = "^0.1"
 
 [build-dependencies]
 cdylib-plugin = "^0.1"
