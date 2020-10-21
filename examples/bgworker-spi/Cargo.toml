@@ -7,7 +7,10 @@ edition = "2018"
 [dependencies]
 postgres-extension = { path = "../.." }
 postgres-extension-macro = { path = "../../postgres-extension-macro" }
-tokio = "0.1"
+
+[dependencies.tokio]
+version = "0.3"
+features = ["net","io-util", "rt", "macros"]
 
 [lib]
 crate-type = ["cdylib"]

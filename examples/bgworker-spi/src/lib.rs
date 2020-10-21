@@ -2,7 +2,6 @@
 extern crate postgres_extension as pgx;
 extern crate tokio;
 
-use std::env;
 use std::ffi::CString;
 use std::net::SocketAddr;
 
@@ -14,11 +13,9 @@ use pgx::utils::palloc::*;
 use pgx::utils::memutils::*;
 use pgx::utils::memutils::c::*;
 
-use tokio::net::TcpListener;
-use tokio::prelude::*;
-use tokio::io::{lines,write_all};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::io::{AsyncReadExt,AsyncWriteExt};
 
-use std::io::BufReader;
 
 static mut BGWORKER_SPI_CONTEXT: MemoryContext = std::ptr::null_mut();
 
@@ -31,26 +28,29 @@ pub fn process_request(line: String) -> Vec<u8> {
         StartTransactionCommand();
     }
     let mut s = String::new();
-    let spi = spi_connect();
-    let catch = std::panic::catch_unwind(|| {
-        spi.execute(&line, false).unwrap()
-    });
-    match catch {
-        Ok(res) => {
-            for tuple in res.iter() {
-                s.push_str("  (");
-                for val in tuple.iter() {
-                    s.push_str(&val);
-                    s.push_str(", ");
+    {
+        let spi = spi_connect();
+        let catch = std::panic::catch_unwind(|| {
+            spi.execute(&line, false).unwrap()
+        });
+        match catch {
+            Ok(res) => {
+                for tuple in res.iter() {
+                    s.push_str("  (");
+                    for val in tuple.iter() {
+                        s.push_str(&val);
+                        s.push_str(", ");
+                    }
+                    s.push_str(")\n");
                 }
-                s.push_str(")\n");
+                s.push_str("}\n");
+            },
+            Err(_) => {
+                s.push_str("ERROR\n");
             }
-            s.push_str("}\n");
-        },
-        Err(_e) => {
-            s.push_str("ERROR\n");
-        }
-    };
+        };
+    }
+
     eprintln!("result: {}", s);
     unsafe {
         let oldcxt = MemoryContextSwitchTo(BGWORKER_SPI_CONTEXT);
@@ -86,6 +86,33 @@ pub extern "C" fn _PG_init() {
     }
 }
 
+async fn process_socket(mut socket: TcpStream) {
+
+    let mut buffer : [u8; 1024] = [0; 1024];
+    let (mut reader, mut writer) = socket.split();
+
+    loop {
+        let n = reader.read(&mut buffer[..]).await.unwrap();
+        let query = std::str::from_utf8(&buffer[0..n]).unwrap();
+        let result = process_request(query.to_string());
+        let _ = writer.write(&result).await;
+    }
+}
+
+#[tokio::main(flavor = "current_thread")]
+async fn start() {
+    let addr = String::from("127.0.0.1:8080").parse::<SocketAddr>().unwrap();
+    let listener = TcpListener::bind(&addr).await.unwrap();
+    println!("Listening on: {}", addr);
+
+    loop {
+        let (socket, _) = listener.accept().await.unwrap();
+        tokio::spawn(async move {
+            process_socket(socket).await;
+        });
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn bgw_main() {
 
@@ -102,36 +129,5 @@ pub extern "C" fn bgw_main() {
             ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
     }
 
-    let addr = String::from("127.0.0.1:8080").parse::<SocketAddr>().unwrap();
-
-    let listener = TcpListener::bind(&addr).unwrap();
-    println!("Listening on: {}", addr);
-
-    let mut runtime = tokio::runtime::current_thread::Runtime::new().unwrap();
-
-    let server = listener
-        .incoming()
-        .for_each(move |socket| {
-            let (reader,writer) = socket.split();
-            let lines = lines(BufReader::new(reader));
-            let responses = lines.map(move |line| {
-                process_request(line)
-            });
-
-            let writes = responses.fold(writer, |writer, response| {
-                write_all(writer, response).map(|(w, _)| w)
-            });
-
-            let msg = writes.and_then(move |_| Ok(())).map_err(|_| ());
-
-            tokio::spawn(msg);
-
-            Ok(())
-        })
-        .map_err(|e| {
-            println!("failed to accept socket; error = {:?}", e);
-        });
-
-    runtime.spawn(server);
-    runtime.run().unwrap();
+    start();
 }
