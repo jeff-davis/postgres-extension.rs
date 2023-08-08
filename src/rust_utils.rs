@@ -57,31 +57,31 @@ macro_rules! longjmp_panic {
         {
             #[allow(unused_unsafe)]
             unsafe {
-                let retval;
-                use std::mem::MaybeUninit;
+                let mut retval = None;
                 use std::panic::panic_any;
+                use $crate::cee_scape::{call_with_sigsetjmp, SigJmpBufStruct};
                 use $crate::utils::elog
                     ::{PG_exception_stack,
                        error_context_stack,
                        ErrorContextCallback};
                 use $crate::rust_utils::PanicType;
-                use $crate::setjmp::{sigsetjmp,sigjmp_buf};
-                let save_exception_stack: *mut sigjmp_buf = PG_exception_stack;
+                let save_exception_stack: *mut SigJmpBufStruct = PG_exception_stack;
                 let save_context_stack: *mut ErrorContextCallback = error_context_stack;
-                let mut local_sigjmp_buf_uninit: MaybeUninit<sigjmp_buf> =
-                    MaybeUninit::uninit();
-                if sigsetjmp(local_sigjmp_buf_uninit.as_mut_ptr(), 0) == 0 {
-                    let mut local_sigjmp_buf = local_sigjmp_buf_uninit.assume_init();
-                    PG_exception_stack = &mut local_sigjmp_buf;
-                    retval = $e;
+                let r = call_with_sigsetjmp(false, |env| {
+                    PG_exception_stack = env as *const SigJmpBufStruct as *mut SigJmpBufStruct;
+                    retval = Some($e);
+                    0
+                });
+
+                if r == 0 {
+                    PG_exception_stack = save_exception_stack;
+                    error_context_stack = save_context_stack;
+                    retval.unwrap()
                 } else {
                     PG_exception_stack = save_exception_stack;
                     error_context_stack = save_context_stack;
                     panic_any(PanicType::ReThrow);
                 }
-                PG_exception_stack = save_exception_stack;
-                error_context_stack = save_context_stack;
-                retval
             }
         }
     }

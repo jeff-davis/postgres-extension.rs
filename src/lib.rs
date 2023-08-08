@@ -4,7 +4,7 @@
 
 // dependencies
 extern crate libc;
-pub extern crate setjmp;
+pub extern crate cee_scape;
 
 // rust modules
 #[macro_use]

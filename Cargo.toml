@@ -10,7 +10,7 @@ documentation = "https://docs.rs/postgres-extension"
 
 [dependencies]
 libc = "0.2.47"
-setjmp = "^0.1"
+cee-scape = "^0.1"
 
 [profile.dev]
 panic = "unwind"

@@ -2,7 +2,7 @@
 #![allow(non_snake_case)]
 
 use libc::*;
-use setjmp::*;
+use cee_scape::*;
 
 #[repr(C)]
 pub struct ErrorContextCallback {
@@ -120,7 +120,7 @@ pub const ERRCODE_EXTERNAL_ROUTINE_EXCEPTION: c_int = make_sqlstate('3','8','0',
 
 extern "C" {
     #[allow(dead_code)]
-    pub static mut PG_exception_stack: *mut sigjmp_buf;
+    pub static mut PG_exception_stack: *mut SigJmpBufStruct;
     pub static mut error_context_stack: *mut ErrorContextCallback;
 }
 
