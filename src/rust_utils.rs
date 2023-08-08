@@ -59,6 +59,7 @@ macro_rules! longjmp_panic {
             unsafe {
                 let retval;
                 use std::mem::MaybeUninit;
+                use std::panic::panic_any;
                 use $crate::utils::elog
                     ::{PG_exception_stack,
                        error_context_stack,
@@ -76,7 +77,7 @@ macro_rules! longjmp_panic {
                 } else {
                     PG_exception_stack = save_exception_stack;
                     error_context_stack = save_context_stack;
-                    panic!(PanicType::ReThrow);
+                    panic_any(PanicType::ReThrow);
                 }
                 PG_exception_stack = save_exception_stack;
                 error_context_stack = save_context_stack;
