@@ -57,7 +57,7 @@ macro_rules! longjmp_panic {
         {
             #[allow(unused_unsafe)]
             unsafe {
-                let mut retval = None;
+                use std::mem::MaybeUninit;
                 use std::panic::panic_any;
                 use $crate::cee_scape::{call_with_sigsetjmp, SigJmpBufStruct};
                 use $crate::utils::elog
@@ -65,18 +65,19 @@ macro_rules! longjmp_panic {
                        error_context_stack,
                        ErrorContextCallback};
                 use $crate::rust_utils::PanicType;
+                let mut retval = MaybeUninit::uninit();
                 let save_exception_stack: *mut SigJmpBufStruct = PG_exception_stack;
                 let save_context_stack: *mut ErrorContextCallback = error_context_stack;
                 let r = call_with_sigsetjmp(false, |env| {
                     PG_exception_stack = env as *const SigJmpBufStruct as *mut SigJmpBufStruct;
-                    retval = Some($e);
+                    retval.write($e);
                     0
                 });
 
                 if r == 0 {
                     PG_exception_stack = save_exception_stack;
                     error_context_stack = save_context_stack;
-                    retval.unwrap()
+                    *retval.as_ptr()
                 } else {
                     PG_exception_stack = save_exception_stack;
                     error_context_stack = save_context_stack;
